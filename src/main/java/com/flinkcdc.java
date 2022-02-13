@@ -19,7 +19,7 @@ public class flinkcdc {
                 .port(3306)
                 .username("root")
                 .password("test")
-                .databaseList()
+                .databaseList("test")
                 .tableList()
                 .deserializer(new StringDebeziumDeserializationSchema())
                 .startupOptions(StartupOptions.initial())
