@@ -1,29 +1,19 @@
 package com;
+
 import com.ververica.cdc.connectors.mysql.MySqlSource;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
-import org.apache.flink.runtime.state.filesystem.FsStateBackend;
-import org.apache.flink.runtime.state.filesystem.FsStateBackendFactory;
-import org.apache.flink.streaming.api.CheckpointingMode;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
-import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.kafka.clients.producer.KafkaProducer;
+import com.MyKafkaUtil.*;
 
-public class flinkcdc {
-    public static void main(String[] args) throws Exception {
+public class flinkcdc_kafka {
+    public static void main(String[] args) {
 //        1. 获取Flink 执行环境
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
-
-//        1.1 开启CheckPoint
-//
-//        env.enableCheckpointing(5000);
-//        env.getCheckpointConfig().setCheckpointTimeout(10000);
-//        env.getCheckpointConfig().setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
-//        env.getCheckpointConfig().setMaxConcurrentCheckpoints(1);
-//        env.setStateBackend(new FsStateBackend  ("hdfs://hadoop01:8020/flink/flink-checkpoints"));
 
 //        2. 通过FlinkCDC构建SourceFuction
         DebeziumSourceFunction<String> SourceFuction = MySqlSource.<String>builder()
@@ -38,10 +28,10 @@ public class flinkcdc {
                 .build();
         DataStreamSource<String> dataStreamSource = env.addSource(SourceFuction);
 
-//        打印数据
+//        3. 打印数据写入Kafka
         dataStreamSource.print();
+        String SinkTopic = "sync_base_db";
+        dataStreamSource.addSink(MyKafkaUtil.getKafkaSink(SinkTopic));
 
-//    启动任务
-        env.execute("flinkCDC");
     }
 }
