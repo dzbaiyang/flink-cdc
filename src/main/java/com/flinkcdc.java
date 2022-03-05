@@ -38,6 +38,7 @@ public class flinkcdc {
                 .build();
         DataStreamSource<String> dataStreamSource = env.addSource(SourceFuction);
 
+
 //        打印数据
         dataStreamSource.print();
 
