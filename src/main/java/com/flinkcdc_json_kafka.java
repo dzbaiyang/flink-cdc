@@ -21,10 +21,10 @@ public class flinkcdc_json_kafka {
                 .username("root")
                 .password("hirisun")
                 .databaseList("fakebob")
-//                .tableList("practice.user")
+//                ("fakebob.student")
                 .serverTimeZone("Asia/Shanghai")
 //                    .startupOptions(StartupOptions.latest())
-                .startupOptions(StartupOptions.earliest())  //earlist是从binlog第一行开始  但是earlist有个限制就是你必须在建库之前就开启binlog  如果你是中途开启binlog earlist会有问题
+                .startupOptions(StartupOptions.initial())  //earlist是从binlog第一行开始  但是earlist有个限制就是你必须在建库之前就开启binlog  如果你是中途开启binlog earlist会有问题
 //                    .startupOptions(StartupOptions.initial())
 //                .startupOptions(KafkaOptions.StartupOptions.class)
                 .deserializer(new StringDebeziumDeserializationSchema())//官方告诉需要反序列化
