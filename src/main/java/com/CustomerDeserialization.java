@@ -1,66 +1,81 @@
 package com;
 
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.data.Envelope;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.SerializableObject;
 import org.apache.kafka.connect.data.Field;
-import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
-import java.util.List;
-
 public class CustomerDeserialization implements DebeziumDeserializationSchema<String> {
-    //自定义数据解析器
+    /**
+     * {
+     * "data":"{"id":11,"tm_name":"sasa"}",
+     * "db":"",
+     * "tableName":"",
+     * "op":"c u d",
+     * "ts":""
+     * }
+     */
     @Override
     public void deserialize(SourceRecord sourceRecord, Collector<String> collector) throws Exception {
-        //获取主题信息,包含着数据库和表名  mysql_binlog_source.gmall-flink.z_user_info
+
+        //获取主题信息,提取数据库和表名
         String topic = sourceRecord.topic();
-        String[] arr = topic.split("\\.");
-        String db = arr[1];
-        String tableName = arr[2];
-        //获取操作类型 READ DELETE UPDATE CREATE
-        Envelope.Operation operation = Envelope.operationFor(sourceRecord);//before空的是因为插入 after是空的是因为删除 修改才是都不为空
-        String type = operation.toString().toLowerCase();
-        if("create".equals(type)){
-            type = "insert";
-        }
-        //获取值信息并转换为Struct类型
+        String[] fields = topic.split("\\.");
+        String db = fields[1];
+        String tableName = fields[2];
+
+        //获取Value信息,提取数据本身
         Struct value = (Struct) sourceRecord.value();
-        //3.获取“befor”数据
-        Struct before = value.getStruct("before");//
+        Struct after = value.getStruct("after");
+        JSONObject jsonObject = new JSONObject();
+        if (after != null) {
+            for (Field field : after.schema().fields()) {
+                Object o = after.get(field);
+                jsonObject.put(field.name(), o);
+            }
+        }
+
+        //获取Value信息,提取删除或者修改的数据本身
+        Struct before = value.getStruct("before");
         JSONObject beforeJson = new JSONObject();
-        if(before !=null) {
-            Schema beforeSchema = before.schema();//字段
-            List<Field> beforeFields = beforeSchema.fields();//存储在列表
-            for (Field field : beforeFields) {  //field 就是 id  name    beforeValue就是id的值，name的值
-                Object beforeValue = before.get(field);
-                beforeJson.put(field.name(), beforeValue);
+        if (before != null) {
+            for (Field field : before.schema().fields()) {
+                Object o = before.get(field);
+                beforeJson.put(field.name(), o);
             }
         }
-        //4.获取“after”数据
-        Struct after = value.getStruct("after");//
-        JSONObject afterJson = new JSONObject();
-        if(after !=null) {
-            Schema afterSchema = after.schema();//字段
-            List<Field> afterFields = afterSchema.fields();//存储在列表
-            for (Field field : afterFields) {  //field 就是 id  name    afterValue就是id的值，name的值
-                Object afterValue = after.get(field);
-                afterJson.put(field.name(), afterValue);
-            }
-        }
-        //创建JSON对象用于封装最终返回值数据信息
+
+        //获取操作类型
+        Envelope.Operation operation = Envelope.operationFor(sourceRecord);
+
+        //创建结果JSON
         JSONObject result = new JSONObject();
-        result.put("operation", operation.toString().toLowerCase());
-        result.put("before", beforeJson);
-        result.put("after", afterJson);
         result.put("database", db);
         result.put("table", tableName);
-        //发送数据至下游
-        collector.collect(result.toJSONString());
+        result.put("data", jsonObject.toJSONString(jsonObject,SerializerFeature.WriteMapNullValue));
+        result.put("before-data", beforeJson.toJSONString(beforeJson,SerializerFeature.WriteMapNullValue));
+        String type = operation.toString().toLowerCase();
+        if ("create".equals(type)) {
+            type = "insert";
+        }
+        result.put("type", type);
+        //将Json输出内容去掉反斜杠
+        String Str1 = StringEscapeUtils.unescapeJavaScript(String.valueOf(result));
+        //输出数据
+        collector.collect(Str1.toString());
     }
+
+
     @Override
-    public TypeInformation<String> getProducedType() { return TypeInformation.of(String.class); }
+    public TypeInformation<String> getProducedType() {
+        return BasicTypeInfo.STRING_TYPE_INFO;
+    }
 }

@@ -37,7 +37,7 @@ public class flinkcdc_json_kafka {
         mysqlDS.print();
         //4.打印数据
 
-        mysqlDS.addSink(MyKafkaUtil.getKafkaSink("sync_base_db"));
+        mysqlDS.addSink(MyKafkaUtil.getKafkaSink("111"));
 
         //5.执行任务
         env.execute("Flinck-CDC-Kafka");
